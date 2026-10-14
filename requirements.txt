@@ -1,0 +1,3 @@
+Flask>=3.0
+# Optional, only for tests/browser_test.py:
+# playwright

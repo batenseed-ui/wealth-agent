@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Wealth Advisory Agent</title>
+  <script>
+    // If this file is opened straight from disk (file://), the CSS, JavaScript and Flask API are all missing.
+    // Replace the broken page with clear instructions instead of a dead form.
+    (function () {
+      if (location.protocol !== "file:") return;
+      document.addEventListener("DOMContentLoaded", function () {
+        document.body.innerHTML =
+          '<div style="max-width:640px;margin:48px auto;padding:0 16px;font:16px/1.6 system-ui,Segoe UI,sans-serif;color:#1c2420">' +
+          '<h1 style="margin:0 0 12px">Open this app through the Flask server</h1>' +
+          '<p>This page was opened directly from a file, so its styling, buttons and calculations cannot work.</p>' +
+          '<ol><li>Start the server in your project folder: <code>python app.py</code> (or double-click <code>start.bat</code>).</li>' +
+          '<li>Then open <a href="http://127.0.0.1:5000">http://127.0.0.1:5000</a> in Chrome.</li></ol>' +
+          '<p style="color:#5d6a63">Keep the server window open while you use the app.</p></div>';
+      });
+    })();
+  </script>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <header class="site-header">
+    <div class="wrap">
+      <h1>Wealth Advisory Agent</h1>
+      <p class="tagline">Enter your numbers, see a transparent financial health score, and get guidance on what to do next.</p>
+    </div>
+  </header>
+
+  <div id="banner" class="banner" role="alert" hidden>
+    <span id="banner-text"></span>
+    <button type="button" id="banner-retry" class="link-btn" hidden>Retry</button>
+    <button type="button" id="banner-close" class="link-btn" aria-label="Dismiss message">Dismiss</button>
+  </div>
+
+  <main class="wrap">
+    <section class="layout">
+      <form id="profile-form" class="card" novalidate autocomplete="off" data-persist="profile">
+        <div class="card-head">
+          <h2>Your finances</h2>
+          <label class="inline">Currency
+            <select id="currency" name="currency">
+              <option value="$">$</option>
+              <option value="RM">RM</option>
+              <option value="£">£</option>
+              <option value="€">€</option>
+              <option value="S$">S$</option>
+              <option value="A$">A$</option>
+            </select>
+          </label>
+        </div>
+
+        <fieldset>
+          <legend>About you</legend>
+          <div class="grid2">
+            <div class="field"><label for="age">Age</label><input id="age" name="age" type="number" inputmode="decimal" min="18" max="100" step="1"><p class="field-error" data-error-for="age"></p></div>
+            <div class="field"><label for="retirement_age">Planned retirement age</label><input id="retirement_age" name="retirement_age" type="number" inputmode="decimal" min="19" max="100" step="1"><p class="field-error" data-error-for="retirement_age"></p></div>
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend>Monthly cash flow</legend>
+          <div class="grid2">
+            <div class="field"><label for="monthly_income">Income after tax</label><input id="monthly_income" name="monthly_income" type="number" inputmode="decimal" min="0" step="any"><p class="field-error" data-error-for="monthly_income"></p></div>
+            <div class="field"><label for="monthly_expenses">Living expenses <span class="hint">(excluding debt payments)</span></label><input id="monthly_expenses" name="monthly_expenses" type="number" inputmode="decimal" min="0" step="any"><p class="field-error" data-error-for="monthly_expenses"></p></div>
+            <div class="field"><label for="monthly_debt_payments">Debt payments</label><input id="monthly_debt_payments" name="monthly_debt_payments" type="number" inputmode="decimal" min="0" step="any"><p class="field-error" data-error-for="monthly_debt_payments"></p></div>
+            <div class="field"><label for="monthly_investment">Invested each month</label><input id="monthly_investment" name="monthly_investment" type="number" inputmode="decimal" min="0" step="any"><p class="field-error" data-error-for="monthly_investment"></p></div>
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend>Balance sheet</legend>
+          <div class="grid2">
+            <div class="field"><label for="liquid_savings">Cash savings</label><input id="liquid_savings" name="liquid_savings" type="number" inputmode="decimal" min="0" step="any"><p class="field-error" data-error-for="liquid_savings"></p></div>
+            <div class="field"><label for="investments">Investments &amp; retirement accounts</label><input id="investments" name="investments" type="number" inputmode="decimal" min="0" step="any"><p class="field-error" data-error-for="investments"></p></div>
+            <div class="field"><label for="total_debt">Total debt outstanding</label><input id="total_debt" name="total_debt" type="number" inputmode="decimal" min="0" step="any"><p class="field-error" data-error-for="total_debt"></p></div>
+            <div class="field"><label for="risk_tolerance">Risk tolerance</label>
+              <select id="risk_tolerance" name="risk_tolerance"><option value="low">Low</option><option value="medium" selected>Medium</option><option value="high">High</option></select>
+              <p class="field-error" data-error-for="risk_tolerance"></p></div>
+          </div>
+          <div class="checks">
+            <label class="check"><input type="checkbox" name="has_health_insurance"> I have health insurance</label>
+            <label class="check"><input type="checkbox" name="has_life_insurance"> I have life / income protection</label>
+          </div>
+        </fieldset>
+
+        <div class="actions">
+          <button type="button" id="btn-analyze" class="btn primary">Analyze My Finances</button>
+          <button type="button" id="btn-advice" class="btn accent">Get AI Wealth Advice</button>
+        </div>
+        <div class="secondary-actions">
+          <button type="button" id="btn-sample" class="link-btn">Fill with sample numbers</button>
+          <button type="button" id="btn-clear" class="link-btn">Clear saved inputs</button>
+        </div>
+        <p class="fine">Inputs are saved in this browser only, so a failed request or a refresh never loses them.</p>
+      </form>
+
+      <div class="results" aria-live="polite">
+        <section id="score-card" class="card" hidden>
+          <h2>Financial health score</h2>
+          <div class="score-row">
+            <div class="ring" role="img" aria-label="Score gauge">
+              <svg viewBox="0 0 120 120" width="150" height="150" aria-hidden="true">
+                <circle class="ring-bg" cx="60" cy="60" r="52"/>
+                <circle id="ring-fg" class="ring-fg" cx="60" cy="60" r="52" transform="rotate(-90 60 60)"/>
+              </svg>
+              <div class="ring-label"><span id="score-num">0</span><small>/ 100</small></div>
+            </div>
+            <div>
+              <p id="score-grade" class="grade"></p>
+              <p id="score-summary" class="muted"></p>
+            </div>
+          </div>
+          <table class="breakdown">
+            <thead><tr><th>Component</th><th>Points</th><th class="bar-col">Progress</th></tr></thead>
+            <tbody id="breakdown-body"></tbody>
+          </table>
+          <div id="guidance"></div>
+        </section>
+
+        <section id="advice-card" class="card" hidden>
+          <div class="card-head"><h2>Wealth advice</h2><span id="advice-badge" class="badge"></span></div>
+          <p id="advice-notice" class="notice" hidden></p>
+          <div id="advice-text" class="advice-text"></div>
+          <p class="fine">Educational guidance based only on the numbers you entered. It is not personalised financial, tax or legal advice.</p>
+        </section>
+
+        <section id="empty-state" class="card empty">
+          <h2>Results appear here</h2>
+          <p class="muted">Fill in the form, then choose <strong>Analyze My Finances</strong> for your score or <strong>Get AI Wealth Advice</strong> for written guidance.</p>
+        </section>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Financial calculators</h2>
+      <div class="calc-grid">
+        <form class="calc" data-calc="compound" data-persist="calc-compound" novalidate autocomplete="off">
+          <h3>Investment growth</h3>
+          <div class="field"><label>Starting amount<input name="initial" type="number" inputmode="decimal" min="0" step="any"></label><p class="field-error" data-error-for="initial"></p></div>
+          <div class="field"><label>Monthly contribution<input name="monthly" type="number" inputmode="decimal" min="0" step="any"></label><p class="field-error" data-error-for="monthly"></p></div>
+          <div class="field"><label>Annual return (%)<input name="rate" type="number" inputmode="decimal" step="any"></label><p class="field-error" data-error-for="rate"></p></div>
+          <div class="field"><label>Years<input name="years" type="number" inputmode="decimal" min="1" step="any"></label><p class="field-error" data-error-for="years"></p></div>
+          <button type="submit" class="btn small">Calculate</button>
+          <div class="calc-out" aria-live="polite"></div>
+        </form>
+
+        <form class="calc" data-calc="loan" data-persist="calc-loan" novalidate autocomplete="off">
+          <h3>Loan payment</h3>
+          <div class="field"><label>Loan amount<input name="principal" type="number" inputmode="decimal" min="0" step="any"></label><p class="field-error" data-error-for="principal"></p></div>
+          <div class="field"><label>Annual interest rate (%)<input name="rate" type="number" inputmode="decimal" min="0" step="any"></label><p class="field-error" data-error-for="rate"></p></div>
+          <div class="field"><label>Term (years)<input name="years" type="number" inputmode="decimal" min="0" step="any"></label><p class="field-error" data-error-for="years"></p></div>
+          <button type="submit" class="btn small">Calculate</button>
+          <div class="calc-out" aria-live="polite"></div>
+        </form>
+
+        <form class="calc" data-calc="goal" data-persist="calc-goal" novalidate autocomplete="off">
+          <h3>Savings goal timeline</h3>
+          <div class="field"><label>Goal amount<input name="target" type="number" inputmode="decimal" min="0" step="any"></label><p class="field-error" data-error-for="target"></p></div>
+          <div class="field"><label>Saved so far<input name="current" type="number" inputmode="decimal" min="0" step="any"></label><p class="field-error" data-error-for="current"></p></div>
+          <div class="field"><label>Monthly saving<input name="monthly" type="number" inputmode="decimal" min="0" step="any"></label><p class="field-error" data-error-for="monthly"></p></div>
+          <div class="field"><label>Annual return (%)<input name="rate" type="number" inputmode="decimal" step="any"></label><p class="field-error" data-error-for="rate"></p></div>
+          <button type="submit" class="btn small">Calculate</button>
+          <div class="calc-out" aria-live="polite"></div>
+        </form>
+      </div>
+    </section>
+
+    <section class="card" id="method-card">
+      <h2>How the score is calculated</h2>
+      <div id="method-body"><p class="muted">Loading the scoring method&hellip;</p></div>
+    </section>
+  </main>
+
+  <footer class="wrap site-footer">Wealth Advisory Agent is an educational tool, not financial advice.</footer>
+  <script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>
